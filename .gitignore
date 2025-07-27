@@ -1,0 +1,12 @@
+config/saves/
+config/state.json
+
+.env
+.env.*
+
+*.log
+.DS_Store
+
+__pycache__/
+*.py[cod]
+*.pyo

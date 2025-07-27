@@ -1,0 +1,5 @@
+{
+  "threshold": 2.0,
+  "refresh_seconds": 60,
+  "reset_minutes": 60
+}
