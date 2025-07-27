@@ -2,7 +2,7 @@ config/saves/
 config/state.json
 
 .env
-.env.*
+!.env.example
 
 *.log
 .DS_Store
