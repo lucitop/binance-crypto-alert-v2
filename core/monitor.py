@@ -1,7 +1,8 @@
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from config.state import load_state
 from core.binance_utils import get_all_futures_prices
+from core.price_tracker import PriceTracker
 from messaging.telegram_bot import send_telegram_message
 
 def start_monitoring(test_mode=False):
@@ -9,11 +10,12 @@ def start_monitoring(test_mode=False):
 
     state = load_state()
     history = {symbol: [] for symbol in state}
+    price_tracker = PriceTracker()
 
     test_counter = 0
 
     while True:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         prices = get_all_futures_prices()
 
         if not prices:
@@ -23,6 +25,13 @@ def start_monitoring(test_mode=False):
 
         print(f"Tick at {now.strftime('%H:%M:%S')}")
         print(f"Received prices for: {list(prices.keys())[:15]} ...")
+
+        # Update price tracking for symbols that had recent alerts
+        price_tracker.update_tracking_data()
+        
+        if price_tracker.get_active_tracking_count() > 0:
+            active_symbols = price_tracker.get_active_symbols()
+            print(f"Currently tracking {len(active_symbols)} symbols: {active_symbols}")
 
         configured_prices = {s: prices[s] for s in state if s in prices}
         print(f"Configured symbol prices: {configured_prices}\n")
@@ -62,12 +71,22 @@ def start_monitoring(test_mode=False):
                 message = f"{symbol} increased by {percentage_change:.2f}% in {window} minutes."
                 send_telegram_message(message)
                 print(f"↑ Alert: {message}")
+                
+                # Start tracking this symbol for the next hour if not already tracking
+                if not price_tracker.is_tracking(symbol):
+                    price_tracker.start_tracking(symbol, price, 'up', percentage_change, window)
+                
                 history[symbol] = [(now, price)]
 
             if alert_down and percentage_change <= -threshold:
                 message = f"{symbol} decreased by {abs(percentage_change):.2f}% in {window} minutes."
                 send_telegram_message(message)
                 print(f"↓ Alert: {message}")
+                
+                # Start tracking this symbol for the next hour if not already tracking
+                if not price_tracker.is_tracking(symbol):
+                    price_tracker.start_tracking(symbol, price, 'down', abs(percentage_change), window)
+                
                 history[symbol] = [(now, price)]
 
         time.sleep(10)
